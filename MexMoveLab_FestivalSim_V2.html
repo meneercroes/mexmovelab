@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>Mex Move Lab — Festival Staff Simulator V2</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Montserrat', sans-serif; background: #0A0A0A; overflow: hidden; color: #fff; }
+
+    /* ──────────── SPLASH ──────────── */
+    #splash {
+      position: fixed; inset: 0; background: #0A0A0A;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; z-index: 9999; text-align: center; padding: 20px;
+    }
+    .motion-brand {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 32px;
+    }
+    .motion-brand img { height: 48px; filter: brightness(1.1); }
+    .motion-brand-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.2); }
+    .motion-brand-label {
+      font-size: 0.65em; color: rgba(255,255,255,0.4);
+      letter-spacing: 4px; text-transform: uppercase; font-weight: 700;
+      text-align: left; line-height: 1.5;
+    }
+    .lab-title {
+      font-size: clamp(2.8em, 10vw, 6em); font-weight: 900; color: #FFFFFF;
+      letter-spacing: 6px; text-transform: uppercase; line-height: 1; margin-bottom: 6px;
+      text-shadow:
+        0.035em -0.035em 0 rgba(65,192,240,0.9),
+        -0.04em 0.04em 0 #E63323,
+        -0.08em 0.08em 0 #FFF042;
+    }
+    .lab-sub {
+      font-size: clamp(0.65em, 2vw, 0.85em); color: #41C0F0;
+      letter-spacing: 7px; text-transform: uppercase; font-weight: 700; margin-bottom: 36px;
+    }
+    .sim-card {
+      border: 1px solid rgba(65,192,240,0.25); border-top: 3px solid #41C0F0;
+      padding: 24px 32px; margin-bottom: 28px; max-width: 480px; width: 100%;
+      background: rgba(255,255,255,0.03);
+    }
+    .sim-card-title { font-size: 1.25em; font-weight: 900; color: #FFF042; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+    .sim-card-desc { font-size: 0.82em; color: rgba(255,255,255,0.55); line-height: 1.7; margin-bottom: 16px; }
+    .sim-stats { display: flex; gap: 16px; font-size: 0.72em; }
+    .sim-stat { color: rgba(255,255,255,0.4); letter-spacing: 1px; }
+    .sim-stat b { color: #41C0F0; }
+    .controls-info {
+      font-size: 0.72em; color: rgba(255,255,255,0.35); line-height: 2;
+      margin-bottom: 28px; letter-spacing: 0.5px;
+    }
+    .controls-info b { color: rgba(65,192,240,0.7); }
+    #start-btn {
+      padding: 15px 55px; font-family: 'Montserrat', sans-serif;
+      font-weight: 900; font-size: 0.9em; letter-spacing: 4px; text-transform: uppercase;
+      background: #41C0F0; color: #0A0A0A; border: none; cursor: pointer;
+      transition: all 0.18s; clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    }
+    #start-btn:hover { background: #FFF042; transform: scale(1.04); }
+    .payoff-line { margin-top: 18px; font-size: 0.65em; color: rgba(255,255,255,0.2); letter-spacing: 3px; font-style: italic; text-transform: uppercase; }
+    .color-strip { display: flex; width: 200px; height: 3px; margin-bottom: 28px; overflow: hidden; }
+    .color-strip span { flex: 1; }
+
+    /* ──────────── HUD ──────────── */
+    #hud {
+      position: fixed; top: 0; left: 0; width: 100%;
+      display: none; pointer-events: none; z-index: 200;
+    }
+    #hud-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 20px; background: rgba(10,10,10,0.9);
+      border-bottom: 2px solid #41C0F0;
+    }
+    #hud-left  { font-size: 0.78em; font-weight: 900; color: #41C0F0; letter-spacing: 3px; text-transform: uppercase; }
+    #hud-mid   { font-size: 0.72em; color: rgba(255,255,255,0.4); letter-spacing: 1px; }
+    #hud-score { font-size: 1em; font-weight: 900; color: #FFF042; letter-spacing: 2px; }
+
+    /* ──────────── FEEDBACK FLASH ──────────── */
+    #feedback { position: fixed; inset: 0; pointer-events: none; z-index: 300; opacity: 0; transition: opacity 0.12s; }
+
+    /* ──────────── LOADING OVERLAY ──────────── */
+    #model-loading {
+      position: fixed; inset: 0; background: rgba(10,10,10,0.97);
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column; z-index: 5000; gap: 16px;
+    }
+    #model-loading.active { display: flex; }
+    .loading-spinner {
+      width: 40px; height: 40px; border: 3px solid rgba(65,192,240,0.2);
+      border-top-color: #41C0F0; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-txt { font-size: 0.72em; color: rgba(255,255,255,0.4); letter-spacing: 3px; text-transform: uppercase; }
+
+    /* ──────────── GAME UI OVERLAY ──────────── */
+    #game-ui {
+      display: none; position: fixed; bottom: 0; left: 0; width: 100%; z-index: 400;
+      padding: 16px 20px 20px;
+      background: linear-gradient(to top, rgba(10,10,10,0.98) 60%, transparent);
+      pointer-events: none;
+    }
+    #game-ui.active { pointer-events: all; }
+    #question-box { text-align: center; margin-bottom: 14px; }
+    #question-label { font-size: 0.65em; color: #41C0F0; letter-spacing: 4px; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; }
+    #question-text { font-size: clamp(1em, 2.5vw, 1.3em); font-weight: 700; color: #FFFFFF; line-height: 1.4; }
+    #answer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 860px; margin: 0 auto; }
+    .answer-btn {
+      font-family: 'Montserrat', sans-serif; font-weight: 700;
+      font-size: clamp(0.72em, 1.5vw, 0.88em); line-height: 1.4; padding: 14px 16px;
+      background: rgba(20,20,40,0.95); color: #FFFFFF;
+      border: 1px solid rgba(65,192,240,0.25); border-top: 3px solid #41C0F0;
+      cursor: pointer; transition: all 0.15s; text-align: center;
+    }
+    .answer-btn:nth-child(2) { border-top-color: #E94190; }
+    .answer-btn:nth-child(3) { border-top-color: #FFF042; }
+    .answer-btn:hover { background: rgba(65,192,240,0.15); border-color: #41C0F0; transform: translateY(-2px); }
+    .answer-btn:nth-child(2):hover { background: rgba(233,65,144,0.15); border-color: #E94190; }
+    .answer-btn:nth-child(3):hover { background: rgba(255,240,66,0.15); border-color: #FFF042; }
+    .answer-btn.correct { background: rgba(65,192,240,0.25) !important; border-color: #41C0F0 !important; }
+    .answer-btn.wrong   { background: rgba(230,51,35,0.25)  !important; border-color: #E63323 !important; opacity: 0.6; }
+    .answer-btn:disabled { cursor: not-allowed; }
+
+    /* ──────────── END SCREEN ──────────── */
+    #end-screen {
+      position: fixed; inset: 0; background: rgba(10,10,10,0.97);
+      display: none; flex-direction: column; align-items: center;
+      justify-content: center; z-index: 9998; text-align: center; padding: 20px;
+    }
+    .end-lab   { font-size: 0.75em; color: #41C0F0; letter-spacing: 5px; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; }
+    .end-title { font-size: 1.6em; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 8px; }
+    .end-score {
+      font-size: clamp(4em, 14vw, 7em); font-weight: 900; color: #41C0F0; line-height: 1; margin: 8px 0;
+      text-shadow: -0.04em 0.04em 0 #E63323, -0.08em 0.08em 0 #FFF042;
+    }
+    .end-max   { font-size: 0.8em; color: rgba(255,255,255,0.35); margin-bottom: 16px; letter-spacing: 2px; }
+    .end-msg   { font-size: 0.9em; color: rgba(255,255,255,0.65); margin-bottom: 32px; max-width: 380px; line-height: 1.6; }
+    #restart-btn {
+      padding: 13px 40px; font-family: 'Montserrat', sans-serif; font-weight: 900;
+      font-size: 0.85em; letter-spacing: 3px; text-transform: uppercase;
+      background: transparent; color: #41C0F0; border: 2px solid #41C0F0; cursor: pointer; transition: all 0.18s;
+    }
+    #restart-btn:hover { background: #41C0F0; color: #0A0A0A; }
+    .end-payoff { margin-top: 20px; font-size: 0.6em; color: rgba(255,255,255,0.2); letter-spacing: 3px; text-transform: uppercase; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     SPLASH SCREEN
+════════════════════════════════════════ -->
+<div id="splash">
+  <div class="motion-brand">
+    <img src="02 Huisstijl/01 Logo/MOTION-Logo Diap.png" alt="MOTION Beweeg College"
+         onerror="this.outerHTML='<span style=\'font-weight:900;font-size:1.4em;letter-spacing:2px;color:#41C0F0\'>MOTION</span>'">
+    <div class="motion-brand-divider"></div>
+    <div class="motion-brand-label">Beweeg College<br>presents</div>
+  </div>
+  <div class="lab-title">Mex Move Lab</div>
+  <div class="lab-sub">Virtual Reality Simulaties</div>
+  <div class="color-strip">
+    <span style="background:#41C0F0"></span>
+    <span style="background:#E94190"></span>
+    <span style="background:#FFF042"></span>
+    <span style="background:#E63323"></span>
+    <span style="background:#27348B"></span>
+  </div>
+  <div class="sim-card">
+    <div class="sim-card-title">🎪 Festival Staff Simulator</div>
+    <div class="sim-card-desc">
+      Jij bent medewerker op het MOTION Festival. Bezoekers komen naar je toe met vragen en problemen.
+      Maak de juiste keuzes en bewijs dat jij klaar bent voor D&amp;P!
+    </div>
+    <div class="sim-stats">
+      <div class="sim-stat"><b>10</b> situaties</div>
+      <div class="sim-stat"><b>+10</b> goed antwoord</div>
+      <div class="sim-stat"><b>-5</b> fout antwoord</div>
+    </div>
+  </div>
+  <div class="controls-info">
+    <b>Desktop:</b> Klik scene → WASD = bewegen &nbsp;·&nbsp; Muis = rondkijken &nbsp;·&nbsp; Klik antwoord<br>
+    <b>Oculus VR:</b> Kijk 2 seconden naar een antwoord om te kiezen
+  </div>
+  <button id="start-btn" onclick="startSim()">▶ &nbsp;Start Simulatie</button>
+  <p class="payoff-line">Leuker leren. Beter presteren.</p>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="hud-bar">
+    <div id="hud-left">Mex Move Lab</div>
+    <div id="hud-mid">Situatie <span id="hud-num">1</span> van 10</div>
+    <div id="hud-score">Score: <span id="score-val">0</span></div>
+  </div>
+</div>
+
+<!-- FEEDBACK FLASH -->
+<div id="feedback"></div>
+
+<!-- MODEL LOADING -->
+<div id="model-loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-txt">MOTION Festival laden…</div>
+</div>
+
+<!-- GAME UI OVERLAY -->
+<div id="game-ui">
+  <div id="question-box">
+    <div id="question-label">📢 Bezoeker vraagt:</div>
+    <div id="question-text">—</div>
+  </div>
+  <div id="answer-grid">
+    <button class="answer-btn" id="abtn-0" onclick="onAnswer(0)"></button>
+    <button class="answer-btn" id="abtn-1" onclick="onAnswer(1)"></button>
+    <button class="answer-btn" id="abtn-2" onclick="onAnswer(2)"></button>
+  </div>
+</div>
+
+<!-- END SCREEN -->
+<div id="end-screen">
+  <div class="end-lab">Mex Move Lab · Festival Staff Simulator</div>
+  <div class="end-title">Simulatie Voltooid</div>
+  <div class="end-score" id="final-score">0</div>
+  <div class="end-max">van 100 punten</div>
+  <div class="end-msg" id="end-msg"></div>
+  <button id="restart-btn" onclick="restartSim()">↺ &nbsp;Opnieuw spelen</button>
+  <div class="end-payoff">Leuker leren. Beter presteren.</div>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     A-FRAME VR SCENE
+════════════════════════════════════════ -->
+<a-scene
+  id="scene"
+  fog="type: exponential; color: #060610; density: 0.02"
+  renderer="antialias: true; colorManagement: true; logarithmicDepthBuffer: true; physicallyCorrectLights: true"
+  vr-mode-ui="enabled: true">
+
+  <a-assets timeout="5000">
+    <img id="logo-tex" src="02 Huisstijl/01 Logo/MOTION-Logo Diap.png" crossorigin="anonymous">
+  </a-assets>
+
+  <!-- ── SKY (gradient via Three.js Canvas Texture, set in JS) ── -->
+  <a-sky id="sky" color="#050510"></a-sky>
+
+  <!-- Stars (JS generated) -->
+  <a-entity id="stars"></a-entity>
+
+  <!-- ── GROUND (canvas texture applied via Three.js in JS) ── -->
+  <a-plane id="ground" rotation="-90 0 0" width="140" height="140"
+           color="#0d0d12" roughness="0.95" metalness="0"></a-plane>
+
+  <!-- Ground markings — guiding lines -->
+  <a-box position="0 0.005 -6" width="0.06" height="0.01" depth="28" color="#FFF042" opacity="0.3" material="emissive:#FFF042;emissiveIntensity:0.1"></a-box>
+  <a-box position="-3.5 0.005 -10" width="0.04" height="0.01" depth="20" color="#41C0F0" opacity="0.1"></a-box>
+  <a-box position=" 3.5 0.005 -10" width="0.04" height="0.01" depth="20" color="#41C0F0" opacity="0.1"></a-box>
+
+  <!-- ── MAIN STAGE (z = -22) ── -->
+  <a-box position="0 0.6 -22"   width="24" depth="12" height="1.2" color="#141418"></a-box>
+  <a-box position="0 1.22 -16.5" width="24" depth="0.12" height="0.08" color="#41C0F0"
+         material="emissive:#41C0F0;emissiveIntensity:0.7"></a-box>
+  <!-- Stage edge light strip -->
+  <a-box position="0 1.23 -16.35" width="24" depth="0.1" height="0.06" color="#E94190"
+         material="emissive:#E94190;emissiveIntensity:0.4"></a-box>
+
+  <!-- Back wall -->
+  <a-box position="0 8.5 -27.8" width="24" depth="0.6" height="17" color="#0a0a14"></a-box>
+  <!-- Side walls -->
+  <a-box position="-12 8 -22" width="0.4" depth="12" height="16" color="#0d0d18"></a-box>
+  <a-box position=" 12 8 -22" width="0.4" depth="12" height="16" color="#0d0d18"></a-box>
+  <!-- Roof (partial) -->
+  <a-box position="0 17 -22" width="24" depth="12" height="0.4" color="#0a0a12"></a-box>
+
+  <!-- MOTION banner on back wall -->
+  <a-box position="0 11 -27.3" width="20" depth="0.15" height="6" color="#0d1a40"></a-box>
+  <a-box position="0 14.1 -27.2" width="20" depth="0.18" height="0.3" color="#41C0F0"
+         material="emissive:#41C0F0;emissiveIntensity:0.6"></a-box>
+  <a-box position="0  7.9 -27.2" width="20" depth="0.18" height="0.3" color="#E94190"
+         material="emissive:#E94190;emissiveIntensity:0.5"></a-box>
+  <!-- Banner side accents -->
+  <a-box position="-10.1 11 -27.2" width="0.2" depth="0.18" height="6" color="#41C0F0"
+         material="emissive:#41C0F0;emissiveIntensity:0.3"></a-box>
+  <a-box position=" 10.1 11 -27.2" width="0.2" depth="0.18" height="6" color="#41C0F0"
+         material="emissive:#41C0F0;emissiveIntensity:0.3"></a-box>
+  <!-- Banner text (A-Frame text — works without file:// issue for big banners) -->
+  <a-text value="MOTION" align="center" color="#FFFFFF" width="28"
+          font="kelsonsans" position="0 11.8 -27.1" side="double"></a-text>
+  <a-text value="BEWEEG COLLEGE FESTIVAL" align="center" color="#FFF042"
+          width="14" position="0 10.1 -27.1" side="double"></a-text>
+
+  <!-- ── TRUSS STRUCTURE ── -->
+  <!-- Main horizontal top bar -->
+  <a-box position="0 19.5 -17" width="22" height="0.35" depth="0.35" color="#222228"></a-box>
+  <!-- Left vertical -->
+  <a-box position="-10.5 14 -17" width="0.35" height="12" depth="0.35" color="#222228"></a-box>
+  <!-- Right vertical -->
+  <a-box position=" 10.5 14 -17" width="0.35" height="12" depth="0.35" color="#222228"></a-box>
+  <!-- Rear top bar -->
+  <a-box position="0 19.5 -27" width="22" height="0.35" depth="0.35" color="#222228"></a-box>
+  <!-- Side depth bars -->
+  <a-box position="-10.5 19.5 -22" width="0.35" height="0.35" depth="10" color="#222228"></a-box>
+  <a-box position=" 10.5 19.5 -22" width="0.35" height="0.35" depth="10" color="#222228"></a-box>
+  <!-- Mid horizontal support -->
+  <a-box position="0 14 -17" width="22" height="0.3" depth="0.3" color="#1c1c22"></a-box>
+
+  <!-- Truss diagonal struts -->
+  <a-box position="-8 16.8 -17" width="0.15" height="5.2" depth="0.15"
+         rotation="0 0 35" color="#1a1a20"></a-box>
+  <a-box position="-4 16.8 -17" width="0.15" height="5.2" depth="0.15"
+         rotation="0 0 -35" color="#1a1a20"></a-box>
+  <a-box position=" 4 16.8 -17" width="0.15" height="5.2" depth="0.15"
+         rotation="0 0 35" color="#1a1a20"></a-box>
+  <a-box position=" 8 16.8 -17" width="0.15" height="5.2" depth="0.15"
+         rotation="0 0 -35" color="#1a1a20"></a-box>
+
+  <!-- ── LIGHTING RIGS (on top bar) ── -->
+  <!-- Fixture housings -->
+  <a-box position="-9 19.2 -17.2" width="0.5" height="0.6" depth="0.7" color="#111116"></a-box>
+  <a-box position="-6 19.2 -17.2" width="0.5" height="0.6" depth="0.7" color="#111116"></a-box>
+  <a-box position="-3 19.2 -17.2" width="0.5" height="0.6" depth="0.7" color="#111116"></a-box>
+  <a-box position=" 0 19.2 -17.2" width="0.5" height="0.6" depth="0.7" color="#111116"></a-box>
+  <a-box position=" 3 19.2 -17.2" width="0.5" height="0.6" depth="0.7" color="#111116"></a-box>
+  <a-box position=" 6 19.2 -17.2" width="0.5" height="0.6" depth="0.7" color="#111116"></a-box>
+  <a-box position=" 9 19.2 -17.2" width="0.5" height="0.6" depth="0.7" color="#111116"></a-box>
+
+  <!-- LIGHT BEAMS — scanning (MOTION kleuren) -->
+  <a-cone position="-9 19 -17.2" radius-top="0.08" radius-bottom="2.8" height="16"
+          color="#41C0F0" opacity="0.11" transparent="true" material="side:double"
+          animation="property: rotation; from: -10 18 -4; to: 8 -22 3; dir: alternate; loop: true; dur: 2800; easing: easeInOutSine"></a-cone>
+  <a-cone position="-6 19 -17.2" radius-top="0.08" radius-bottom="2.2" height="16"
+          color="#E94190" opacity="0.12" transparent="true" material="side:double"
+          animation="property: rotation; from: -6 10 0; to: 5 -16 0; dir: alternate; loop: true; dur: 3300; easing: easeInOutSine"></a-cone>
+  <a-cone position="-3 19 -17.2" radius-top="0.08" radius-bottom="2.5" height="16"
+          color="#FFF042" opacity="0.09" transparent="true" material="side:double"
+          animation="property: rotation; from: -4 -25 1; to: -4 22 -1; dir: alternate; loop: true; dur: 2100; easing: easeInOutSine"></a-cone>
+  <a-cone position=" 0 19 -17.2" radius-top="0.08" radius-bottom="2.8" height="16"
+          color="#41C0F0" opacity="0.10" transparent="true" material="side:double"
+          animation="property: rotation; from: -5 -10 0; to: 5 10 0; dir: alternate; loop: true; dur: 1800; easing: easeInOutSine"></a-cone>
+  <a-cone position=" 3 19 -17.2" radius-top="0.08" radius-bottom="2.2" height="16"
+          color="#E63323" opacity="0.12" transparent="true" material="side:double"
+          animation="property: rotation; from: -6 -12 0; to: 5 14 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine"></a-cone>
+  <a-cone position=" 6 19 -17.2" radius-top="0.08" radius-bottom="2.5" height="16"
+          color="#27348B" opacity="0.13" transparent="true" material="side:double"
+          animation="property: rotation; from: -8 -20 -3; to: 6 20 2; dir: alternate; loop: true; dur: 2500; easing: easeInOutSine"></a-cone>
+  <a-cone position=" 9 19 -17.2" radius-top="0.08" radius-bottom="2.8" height="16"
+          color="#E94190" opacity="0.11" transparent="true" material="side:double"
+          animation="property: rotation; from: -10 -18 4; to: 8 22 -3; dir: alternate; loop: true; dur: 2700; easing: easeInOutSine"></a-cone>
+
+  <!-- STAGE POINT LIGHTS — color pulsing -->
+  <a-light type="point" position="-9 16 -20" color="#41C0F0" intensity="4" distance="35"
+           animation="property: intensity; from: 2; to: 6; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-light>
+  <a-light type="point" position="-4 16 -20" color="#E94190" intensity="4" distance="35"
+           animation="property: intensity; from: 1.5; to: 5.5; dir: alternate; loop: true; dur: 1900; easing: easeInOutSine"></a-light>
+  <a-light type="point" position=" 0 16 -20" color="#FFF042" intensity="3" distance="30"
+           animation="property: intensity; from: 1; to: 5; dir: alternate; loop: true; dur: 800; easing: easeInOutSine"></a-light>
+  <a-light type="point" position=" 4 16 -20" color="#E63323" intensity="3.5" distance="30"
+           animation="property: intensity; from: 2; to: 5; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"></a-light>
+  <a-light type="point" position=" 9 16 -20" color="#27348B" intensity="4" distance="35"
+           animation="property: intensity; from: 1.5; to: 5.5; dir: alternate; loop: true; dur: 2100; easing: easeInOutSine"></a-light>
+  <!-- Front fill light toward player -->
+  <a-light type="spot" position="0 14 -17" target="#rig" color="#41C0F0"
+           intensity="0.8" distance="22" angle="35" penumbra="0.4"></a-light>
+  <!-- Global ambient -->
+  <a-light type="ambient" color="#18182a" intensity="1.2"></a-light>
+  <!-- Moon-like directional from above/behind -->
+  <a-light type="directional" position="5 20 5" color="#8090c0" intensity="0.3"></a-light>
+
+  <!-- PARTICLES (JS generated) -->
+  <a-entity id="particles"></a-entity>
+
+  <!-- ── SIDE CROWD BARRIERS / FENCING ── -->
+  <!-- Left fence -->
+  <a-box position="-13.5 0.55 -8" width="0.08" height="1.1" depth="32" color="#1e1e28" opacity="0.9"></a-box>
+  <a-box position="-13.5 1.12 -8" width="0.08" height="0.07" depth="32" color="#888" opacity="0.5"></a-box>
+  <!-- Right fence -->
+  <a-box position=" 13.5 0.55 -8" width="0.08" height="1.1" depth="32" color="#1e1e28" opacity="0.9"></a-box>
+  <a-box position=" 13.5 1.12 -8" width="0.08" height="0.07" depth="32" color="#888" opacity="0.5"></a-box>
+
+  <!-- Fence posts L -->
+  <a-box position="-13.5 0.55  0" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+  <a-box position="-13.5 0.55 -6" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+  <a-box position="-13.5 0.55 -12" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+  <a-box position="-13.5 0.55 -18" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+  <!-- Fence posts R -->
+  <a-box position=" 13.5 0.55  0" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+  <a-box position=" 13.5 0.55 -6" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+  <a-box position=" 13.5 0.55 -12" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+  <a-box position=" 13.5 0.55 -18" width="0.14" height="1.2" depth="0.14" color="#333"></a-box>
+
+  <!-- ── FESTIVAL FLAGS (left) ── -->
+  <a-entity position="-11 0 -5">
+    <a-cylinder radius="0.065" height="7.5" color="#2a2a30" position="0 3.75 0"></a-cylinder>
+    <a-box position="0.9 7.1 0" width="1.6" height="0.9" depth="0.07" color="#41C0F0"
+           material="emissive:#41C0F0;emissiveIntensity:0.3"
+           animation="property: rotation; from: 0 -5 -2; to: 0 5 2; dir: alternate; loop: true; dur: 1800; easing: easeInOutSine"></a-box>
+  </a-entity>
+  <a-entity position="-11 0 -10">
+    <a-cylinder radius="0.065" height="7.5" color="#2a2a30" position="0 3.75 0"></a-cylinder>
+    <a-box position="0.9 7.1 0" width="1.6" height="0.9" depth="0.07" color="#E94190"
+           material="emissive:#E94190;emissiveIntensity:0.25"
+           animation="property: rotation; from: 0 3 -1; to: 0 -3 1; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine"></a-box>
+  </a-entity>
+  <a-entity position="-11 0 -15">
+    <a-cylinder radius="0.065" height="7.5" color="#2a2a30" position="0 3.75 0"></a-cylinder>
+    <a-box position="0.9 7.1 0" width="1.6" height="0.9" depth="0.07" color="#FFF042"
+           material="emissive:#FFF042;emissiveIntensity:0.2"
+           animation="property: rotation; from: 0 -4 -1; to: 0 4 1; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"></a-box>
+  </a-entity>
+  <!-- Flags right -->
+  <a-entity position=" 11 0 -5">
+    <a-cylinder radius="0.065" height="7.5" color="#2a2a30" position="0 3.75 0"></a-cylinder>
+    <a-box position="-0.9 7.1 0" width="1.6" height="0.9" depth="0.07" color="#E63323"
+           material="emissive:#E63323;emissiveIntensity:0.2"
+           animation="property: rotation; from: 0 5 2; to: 0 -5 -2; dir: alternate; loop: true; dur: 1900; easing: easeInOutSine"></a-box>
+  </a-entity>
+  <a-entity position=" 11 0 -10">
+    <a-cylinder radius="0.065" height="7.5" color="#2a2a30" position="0 3.75 0"></a-cylinder>
+    <a-box position="-0.9 7.1 0" width="1.6" height="0.9" depth="0.07" color="#27348B"
+           material="emissive:#27348B;emissiveIntensity:0.3"
+           animation="property: rotation; from: 0 -6 -2; to: 0 6 2; dir: alternate; loop: true; dur: 2100; easing: easeInOutSine"></a-box>
+  </a-entity>
+  <a-entity position=" 11 0 -15">
+    <a-cylinder radius="0.065" height="7.5" color="#2a2a30" position="0 3.75 0"></a-cylinder>
+    <a-box position="-0.9 7.1 0" width="1.6" height="0.9" depth="0.07" color="#41C0F0"
+           material="emissive:#41C0F0;emissiveIntensity:0.3"
+           animation="property: rotation; from: 0 4 1; to: 0 -4 -1; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine"></a-box>
+  </a-entity>
+
+  <!-- ── STAFF BOOTH ── -->
+  <!-- Counter body -->
+  <a-box position="0 0.65 2" width="4" depth="0.7" height="1.3" color="#101020"></a-box>
+  <!-- Counter top -->
+  <a-box position="0 1.31 1.7" width="4.2" depth="1.1" height="0.1" color="#18182e"></a-box>
+  <!-- Counter front glow strip -->
+  <a-box position="0 0.02 1.66" width="4.2" depth="0.07" height="0.05" color="#41C0F0"
+         material="emissive:#41C0F0;emissiveIntensity:0.7"></a-box>
+  <!-- Sign post -->
+  <a-cylinder position="0 2.6 2.1" radius="0.045" height="2.8" color="#222"></a-cylinder>
+  <!-- Sign board -->
+  <a-box position="0 3.75 2.1" width="3.2" depth="0.1" height="0.8" color="#0d1a40"></a-box>
+  <a-box position="0 4.16 2.1" width="3.2" depth="0.12" height="0.09" color="#41C0F0"
+         material="emissive:#41C0F0;emissiveIntensity:0.5"></a-box>
+  <a-box position="0 3.34 2.1" width="3.2" depth="0.12" height="0.07" color="#E94190"
+         material="emissive:#E94190;emissiveIntensity:0.3"></a-box>
+  <a-text value="MOTION STAFF" align="center" color="#FFF042"
+          width="4" position="0 3.75 2.17" side="double"></a-text>
+  <!-- Booth light -->
+  <a-light type="point" position="0 3.2 2" color="#41C0F0" intensity="1.5" distance="7"></a-light>
+
+  <!-- Side props at booth -->
+  <!-- Retractable post L -->
+  <a-cylinder position="-2.5 0.5 2" radius="0.04" height="1" color="#888"></a-cylinder>
+  <a-cylinder position=" 2.5 0.5 2" radius="0.04" height="1" color="#888"></a-cylinder>
+  <!-- Belt between posts -->
+  <a-box position="0 0.75 2" width="5" height="0.025" depth="0.025" color="#E94190"
+         material="emissive:#E94190;emissiveIntensity:0.2"></a-box>
+
+  <!-- ── BACKGROUND STAGE PROPS ── -->
+  <!-- DJ booth on stage -->
+  <a-box position="0 1.3 -19" width="2.5" depth="1.5" height="1.4" color="#0d0d18"></a-box>
+  <a-box position="0 2.02 -19" width="2.6" depth="1.55" height="0.08" color="#1a1a28"></a-box>
+  <!-- Monitor screens on stage (glowing blue) -->
+  <a-box position="-4.5 2.8 -21" width="2.5" height="1.5" depth="0.08" color="#0d1a35"
+         material="emissive:#0d1a35;emissiveIntensity:0.4"></a-box>
+  <a-box position=" 4.5 2.8 -21" width="2.5" height="1.5" depth="0.08" color="#0d1a35"
+         material="emissive:#0d1a35;emissiveIntensity:0.4"></a-box>
+  <a-box position="-4.5 2.82 -20.95" width="2.46" height="1.46" depth="0.04" color="#164194"
+         material="emissive:#164194;emissiveIntensity:0.6"></a-box>
+  <a-box position=" 4.5 2.82 -20.95" width="2.46" height="1.46" depth="0.04" color="#164194"
+         material="emissive:#164194;emissiveIntensity:0.6"></a-box>
+  <!-- Speaker stacks -->
+  <a-box position="-10.5 2.5 -16.8" width="1.8" height="4" depth="1.4" color="#0d0d10"></a-box>
+  <a-box position=" 10.5 2.5 -16.8" width="1.8" height="4" depth="1.4" color="#0d0d10"></a-box>
+  <a-box position="-10.5 5.2 -16.8" width="1.8" height="1.5" depth="1.4" color="#111116"></a-box>
+  <a-box position=" 10.5 5.2 -16.8" width="1.8" height="1.5" depth="1.4" color="#111116"></a-box>
+
+  <!-- ── CROWD (JS generated with realistic bodies) ── -->
+  <a-entity id="crowd"></a-entity>
+
+  <!-- ══════════════════════════════════════
+       VISITOR — canvas sprite person
+  ══════════════════════════════════════ -->
+  <a-entity id="visitor" visible="false" position="0 0 -8">
+    <a-plane id="visitor-plane"
+             width="1.4" height="2.4"
+             position="0 1.2 0"
+             material="transparent: true; alphaTest: 0.3; side: double; depthWrite: false">
+    </a-plane>
+    <!-- Small spotlight on visitor -->
+    <a-light type="point" position="0 3 1" color="#ffffff" intensity="0.6" distance="5"></a-light>
+  </a-entity>
+
+  <!-- ══════════════════════════════════════
+       CAMERA RIG
+  ══════════════════════════════════════ -->
+  <a-entity id="rig" position="0 0 4.5">
+    <a-camera
+      look-controls="pointerLockEnabled: true"
+      wasd-controls="acceleration: 22; fly: false"
+      position="0 1.65 0">
+      <a-cursor
+        fuse="true"
+        fuse-timeout="2000"
+        color="#41C0F0"
+        opacity="0.85"
+        raycaster="objects: .clickable"
+        animation__click="property: scale; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150; startEvents: click"
+        animation__fusing="property: scale; from: 1 1 1; to: 0.1 0.1 0.1; dur: 2000; startEvents: fusing"
+        animation__fusing-reset="property: scale; to: 1 1 1; dur: 1; startEvents: mouseleave">
+      </a-cursor>
+    </a-camera>
+  </a-entity>
+
+</a-scene>
+
+<!-- ════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─── SCENARIOS ─── */
+const BASE_SCENARIOS = [
+  {
+    question: "Hé, weet jij waar Podium A is? Ik ben de weg kwijt!",
+    answers: [
+      { text: "Rechts van de ingang, volg de blauwe pijlen naar het hoofdpodium", correct: true },
+      { text: "Weet ik niet, vraag maar aan iemand anders", correct: false },
+      { text: "Links naast de parkeerplaats, achter de foodtrucks", correct: false }
+    ]
+  },
+  {
+    question: "Help! Ik ben mijn festivalpolsbandje kwijt. Ik heb mijn ticket nog op mijn telefoon.",
+    answers: [
+      { text: "Zonder polsband kom je er helaas niet meer in, sorry", correct: false },
+      { text: "Ga naar de accreditatiebalie bij de ingang, ze controleren je digitale ticket en geven een nieuw bandje", correct: true },
+      { text: "Koop een nieuw ticket online en kom terug bij de ingang", correct: false }
+    ]
+  },
+  {
+    question: "Iemand naast mij valt flauw! Ze reageert niet meer!",
+    answers: [
+      { text: "Vraag haar of ze zich beter voelt en geef haar water", correct: false },
+      { text: "Stuur haar vrienden weg en bel de beveiliging", correct: false },
+      { text: "Roep luid om hulp, stuur iemand naar de EHBO-post en zorg dat er ruimte is", correct: true }
+    ]
+  },
+  {
+    question: "Ik zoek mijn zoontje van 7 — hij heet Liam. We zijn elkaar kwijt bij het foodplein!",
+    answers: [
+      { text: "Zeg dat ze bij de ingang moeten wachten totdat het kind vanzelf opdaagt", correct: false },
+      { text: "Begeleid de ouder direct naar het meldpunt 'Kwijt & Gevonden' bij de festivalstaf en geef een beschrijving door", correct: true },
+      { text: "Laat de ouder zelf door de menigte zoeken, jij blijft op je post", correct: false }
+    ]
+  },
+  {
+    question: "Twee bezoekers schreeuwen naar elkaar en het lijkt te escaleren. Wat doe jij?",
+    answers: [
+      { text: "Tussenbeide komen en zelf de situatie oplossen door te bemiddelen", correct: false },
+      { text: "Snel de beveiliging erbij roepen en de omstanders vragen weg te gaan", correct: true },
+      { text: "Videoshooten zodat er bewijs is en dan pas ingrijpen", correct: false }
+    ]
+  },
+  {
+    question: "Een bezoeker in een rolstoel vraagt hoe ze bij het podium kan kijken — ze ziet niets door de menigte.",
+    answers: [
+      { text: "Zeggen dat het druk is en dat ze beter vroeg had moeten komen", correct: false },
+      { text: "Begeleiden naar het speciale rolstoelplatform links van het podium en haar comfortabel neerzetten", correct: true },
+      { text: "Een stoel zoeken en haar ergens halverwege neerzetten", correct: false }
+    ]
+  },
+  {
+    question: "Het begint hard te regenen en bezoekers vragen of het festival doorgaat. Jij weet het officiële beleid niet.",
+    answers: [
+      { text: "Zeggen dat het festival altijd doorgaat, geen zorgen", correct: false },
+      { text: "Zeggen dat je het niet zeker weet en hen verwijzen naar de festivalapp of het info-punt voor de officiële melding", correct: true },
+      { text: "Je schouders ophalen — daar ga jij niet over", correct: false }
+    ]
+  },
+  {
+    question: "Een bezoeker wil een terugbetaling voor zijn drankje — de tap gaf te weinig bier in het glas.",
+    answers: [
+      { text: "Zelf geld teruggeven uit je eigen portemonnee zodat hij tevreden is", correct: false },
+      { text: "Zeggen dat drankjes nooit worden terugbetaald en wegkijken", correct: false },
+      { text: "Vriendelijk uitleggen dat klachten over drankverkoop bij de barmanager zijn en hem daarheen wijzen", correct: true }
+    ]
+  },
+  {
+    question: "Een groep heeft duidelijk te veel gedronken en wil toch nog het festivalterrein op.",
+    answers: [
+      { text: "Ze binnenlaten — ze hebben betaald en het is hun eigen verantwoordelijkheid", correct: false },
+      { text: "De beveiliging inseinen en rustig maar duidelijk aangeven dat toegang geweigerd wordt", correct: true },
+      { text: "Ze zelf wegsturen en boos worden zodat ze ophouden met zeuren", correct: false }
+    ]
+  },
+  {
+    question: "Een bezoeker meldt dat iemand zijn rugzak heeft gestolen bij de garderobepost.",
+    answers: [
+      { text: "Zeggen dat het festival niet verantwoordelijk is voor diefstal", correct: false },
+      { text: "Je eigen onderzoek starten en de garderobe doorzoeken", correct: false },
+      { text: "Slachtoffer begeleiden naar de beveiliging om aangifte te doen en de situatie noteren in het logboek", correct: true }
+    ]
+  }
+];
+
+/* ─── STATE ─── */
+let score = 0;
+let current = 0;
+let scenarios = [];
+let answered = false;
+let audioCtx = null;
+let visitorModelLoaded = false;
+
+/* ─── UTILS ─── */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ─── AUDIO — uitgeschakeld ─── */
+function initAudio() { /* geen geluid */ }
+
+function playCorrect() { /* geen geluid */ }
+function playWrong()   { /* geen geluid */ }
+
+/* ─── PROCEDURAL TEXTURES via Three.js ─── */
+function applyGroundTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Base asphalt
+  ctx.fillStyle = '#0d0d12';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Grain / aggregate
+  for (let i = 0; i < 6000; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const v = Math.floor(Math.random() * 22);
+    const r = Math.random() * 1.2;
+    ctx.fillStyle = `rgba(${v},${v},${v+3},0.45)`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Subtle cracked lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 20; i++) {
+    const sx = Math.random() * 512; const sy = Math.random() * 512;
+    ctx.beginPath(); ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + (Math.random()-0.5)*80, sy + (Math.random()-0.5)*80);
+    ctx.stroke();
+  }
+
+  // Puddle reflections (light patches on dark)
+  for (let i = 0; i < 5; i++) {
+    const grd = ctx.createRadialGradient(
+      Math.random()*400+50, Math.random()*400+50, 0,
+      Math.random()*400+50, Math.random()*400+50, 40
+    );
+    grd.addColorStop(0, 'rgba(65,192,240,0.06)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 512, 512);
+  }
+
+  const ground = document.querySelector('#ground');
+  const applyTex = () => {
+    const mesh = ground.getObject3D('mesh');
+    if (mesh && mesh.material) {
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(14, 14);
+      mesh.material.map = tex;
+      mesh.material.color.setHex(0x111118);
+      mesh.material.roughness = 0.95;
+      mesh.material.needsUpdate = true;
+    }
+  };
+  if (ground.hasLoaded) { applyTex(); }
+  else { ground.addEventListener('loaded', applyTex, { once: true }); }
+}
+
+function applySkyTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048; canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+
+  // Night sky gradient
+  const grd = ctx.createLinearGradient(0, 0, 0, 1024);
+  grd.addColorStop(0,    '#020208');
+  grd.addColorStop(0.5,  '#040410');
+  grd.addColorStop(0.75, '#0a0820');
+  grd.addColorStop(0.88, '#1a1248');
+  grd.addColorStop(0.95, '#281060');
+  grd.addColorStop(1,    '#180840');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, 2048, 1024);
+
+  // Add stage glow on horizon (bottom left)
+  const glow1 = ctx.createRadialGradient(600, 980, 0, 600, 1024, 350);
+  glow1.addColorStop(0, 'rgba(65,192,240,0.18)');
+  glow1.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow1; ctx.fillRect(0, 0, 2048, 1024);
+
+  const glow2 = ctx.createRadialGradient(1100, 990, 0, 1100, 1024, 280);
+  glow2.addColorStop(0, 'rgba(233,65,144,0.14)');
+  glow2.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow2; ctx.fillRect(0, 0, 2048, 1024);
+
+  // Stars
+  for (let i = 0; i < 400; i++) {
+    const x = Math.random() * 2048;
+    const y = Math.random() * 600;
+    const r = Math.random() * 1.4;
+    const br = Math.floor(180 + Math.random() * 75);
+    ctx.fillStyle = `rgba(${br},${br},${br+10},${0.5 + Math.random() * 0.5})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const sky = document.querySelector('#sky');
+  const applyTex = () => {
+    const mesh = sky.getObject3D('mesh');
+    if (mesh && mesh.material) {
+      const tex = new THREE.CanvasTexture(canvas);
+      mesh.material.map = tex;
+      mesh.material.needsUpdate = true;
+    }
+  };
+  if (sky.hasLoaded) { applyTex(); }
+  else { sky.addEventListener('loaded', applyTex, { once: true }); }
+}
+
+/* ─── STARS (3D entities for extra depth) ─── */
+function spawnStars() {
+  const container = document.getElementById('stars');
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < 120; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI * 0.5;
+    const r = 55 + Math.random() * 15;
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = 12 + Math.random() * 30;
+    const z = r * Math.sin(phi) * Math.sin(theta);
+    const s = 0.04 + Math.random() * 0.09;
+    const br = [255, 220, 200][Math.floor(Math.random() * 3)];
+    const e = document.createElement('a-sphere');
+    e.setAttribute('position', `${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}`);
+    e.setAttribute('radius', s.toFixed(3));
+    e.setAttribute('material', `color: rgb(${br},${br},${br+15}); emissive: rgb(${br},${br},${br}); emissiveIntensity: 1; shader: flat`);
+    frag.appendChild(e);
+  }
+  container.appendChild(frag);
+}
+
+/* ─── PARTICLES ─── */
+function spawnParticles() {
+  const container = document.getElementById('particles');
+  const COLS = ['#41C0F0','#E94190','#FFF042','#E63323','#FFFFFF','#27348B'];
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < 45; i++) {
+    const x = (Math.random() - 0.5) * 22;
+    const y = 3 + Math.random() * 12;
+    const z = -6 - Math.random() * 18;
+    const s = 0.04 + Math.random() * 0.1;
+    const col = COLS[i % COLS.length];
+    const dur = 2000 + Math.random() * 4000;
+    const dy = 1.5 + Math.random() * 3;
+    const e = document.createElement('a-sphere');
+    e.setAttribute('position', `${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}`);
+    e.setAttribute('radius', s.toFixed(3));
+    e.setAttribute('material', `color: ${col}; emissive: ${col}; emissiveIntensity: 1.2; shader: flat`);
+    e.setAttribute('animation', `property: position; from: ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}; to: ${(x+(Math.random()-.5)*2).toFixed(1)} ${(y+dy).toFixed(1)} ${(z+(Math.random()-.5)*2).toFixed(1)}; dir: alternate; loop: true; dur: ${Math.floor(dur)}; easing: easeInOutSine`);
+    frag.appendChild(e);
+  }
+  container.appendChild(frag);
+}
+
+/* ─── PERSON SPRITE — canvas drawing ─── */
+function drawPersonSprite(cfg) {
+  const W = 256, H = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const cx = W / 2;
+  // Layout Y positions
+  const shoeY   = H - 22;
+  const legTop  = Math.round(H * 0.44);
+  const torsoTop= Math.round(H * 0.27);
+  const neckTop = Math.round(H * 0.23);
+  const headCY  = Math.round(H * 0.155);
+  const headRX  = 34, headRY = 40;
+
+  // ── SHOES ──
+  ctx.fillStyle = '#181010';
+  ctx.beginPath(); ctx.ellipse(cx - 19, shoeY, 20, 11, -0.08, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 19, shoeY, 20, 11,  0.08, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#0a0808';
+  ctx.beginPath(); ctx.ellipse(cx - 22, shoeY - 3, 12, 7, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 22, shoeY - 3, 12, 7, 0, 0, Math.PI*2); ctx.fill();
+
+  // ── PANTS ──
+  ctx.fillStyle = cfg.pantsColor;
+  // Left leg
+  ctx.beginPath();
+  ctx.moveTo(cx - 34, legTop); ctx.lineTo(cx - 6, legTop);
+  ctx.lineTo(cx - 10, shoeY - 8); ctx.lineTo(cx - 34, shoeY - 8);
+  ctx.closePath(); ctx.fill();
+  // Right leg
+  ctx.beginPath();
+  ctx.moveTo(cx + 6, legTop); ctx.lineTo(cx + 34, legTop);
+  ctx.lineTo(cx + 34, shoeY - 8); ctx.lineTo(cx + 10, shoeY - 8);
+  ctx.closePath(); ctx.fill();
+  // Belt
+  ctx.fillStyle = cfg.pantsColor === '#1a1a2e' ? '#111' : '#2a1a08';
+  ctx.fillRect(cx - 34, legTop - 6, 68, 8);
+
+  // ── SHIRT / JACKET ──
+  ctx.fillStyle = cfg.shirtColor;
+  // Torso
+  ctx.beginPath();
+  ctx.moveTo(cx - 40, torsoTop + 4); ctx.lineTo(cx + 40, torsoTop + 4);
+  ctx.lineTo(cx + 34, legTop + 4); ctx.lineTo(cx - 34, legTop + 4);
+  ctx.closePath(); ctx.fill();
+  // Shoulders
+  ctx.beginPath(); ctx.ellipse(cx - 36, torsoTop + 8, 18, 10, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 36, torsoTop + 8, 18, 10,  0.3, 0, Math.PI*2); ctx.fill();
+  // Left arm
+  ctx.beginPath();
+  ctx.moveTo(cx - 52, torsoTop + 10); ctx.lineTo(cx - 34, torsoTop + 10);
+  ctx.lineTo(cx - 38, legTop - 10); ctx.lineTo(cx - 58, legTop - 10);
+  ctx.closePath(); ctx.fill();
+  // Right arm
+  ctx.beginPath();
+  ctx.moveTo(cx + 34, torsoTop + 10); ctx.lineTo(cx + 52, torsoTop + 10);
+  ctx.lineTo(cx + 58, legTop - 10); ctx.lineTo(cx + 38, legTop - 10);
+  ctx.closePath(); ctx.fill();
+  // Collar
+  ctx.fillStyle = cfg.shirtColor;
+  ctx.beginPath(); ctx.moveTo(cx - 12, torsoTop + 4); ctx.lineTo(cx, torsoTop + 16); ctx.lineTo(cx + 12, torsoTop + 4); ctx.closePath(); ctx.fill();
+
+  // Shirt detail — logo/print hint (festival vibe)
+  if (cfg.hasLogo) {
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(cx - 12, torsoTop + 20, 24, 16);
+  }
+
+  // ── HANDS / WRISTS ──
+  ctx.fillStyle = cfg.skinColor;
+  ctx.beginPath(); ctx.ellipse(cx - 56, legTop - 18, 11, 14, 0.15, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 56, legTop - 18, 11, 14,-0.15, 0, Math.PI*2); ctx.fill();
+
+  // ── NECK ──
+  ctx.fillStyle = cfg.skinColor;
+  ctx.beginPath();
+  ctx.roundRect(cx - 13, neckTop, 26, torsoTop - neckTop + 6, 5);
+  ctx.fill();
+
+  // ── HEAD ──
+  ctx.fillStyle = cfg.skinColor;
+  ctx.beginPath(); ctx.ellipse(cx, headCY, headRX, headRY, 0, 0, Math.PI*2); ctx.fill();
+
+  // Ear L
+  ctx.beginPath(); ctx.ellipse(cx - headRX + 1, headCY + 4, 7, 10, 0.1, 0, Math.PI*2); ctx.fill();
+  // Ear R
+  ctx.beginPath(); ctx.ellipse(cx + headRX - 1, headCY + 4, 7, 10,-0.1, 0, Math.PI*2); ctx.fill();
+
+  // ── HAIR ──
+  ctx.fillStyle = cfg.hairColor;
+  if (cfg.hairStyle === 'short') {
+    ctx.beginPath();
+    ctx.ellipse(cx, headCY - headRY * 0.35, headRX + 3, headRY * 0.72, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx - headRX + 2, headCY - 5, 9, headRY * 0.65, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + headRX - 2, headCY - 5, 9, headRY * 0.65, 0, 0, Math.PI*2); ctx.fill();
+  } else if (cfg.hairStyle === 'long') {
+    ctx.beginPath();
+    ctx.ellipse(cx, headCY - headRY * 0.4, headRX + 4, headRY * 0.7, 0, Math.PI, 0);
+    ctx.fill();
+    // Long flowing strands
+    ctx.beginPath();
+    ctx.moveTo(cx - headRX + 2, headCY - 8);
+    ctx.bezierCurveTo(cx - headRX - 10, headCY + 25, cx - headRX - 4, neckTop + 30, cx - headRX + 8, neckTop + 20);
+    ctx.bezierCurveTo(cx - headRX + 4, neckTop + 10, cx - headRX + 8, headCY + 5, cx - headRX + 4, headCY - 6);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + headRX - 2, headCY - 8);
+    ctx.bezierCurveTo(cx + headRX + 10, headCY + 25, cx + headRX + 4, neckTop + 30, cx + headRX - 8, neckTop + 20);
+    ctx.bezierCurveTo(cx + headRX - 4, neckTop + 10, cx + headRX - 8, headCY + 5, cx + headRX - 4, headCY - 6);
+    ctx.fill();
+  } else if (cfg.hairStyle === 'curly') {
+    // Full afro/curly cloud
+    for (let angle = 0; angle < Math.PI * 2; angle += 0.28) {
+      const pr = headRX + 7;
+      const px = cx + pr * Math.cos(angle);
+      const py = headCY - 5 + (headRY + 4) * Math.sin(angle) * 0.7;
+      ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.ellipse(cx, headCY - 8, headRX + 3, headRY * 0.72, 0, 0, Math.PI*2); ctx.fill();
+  } else { // bun / updo
+    ctx.beginPath();
+    ctx.ellipse(cx, headCY - headRY * 0.4, headRX + 2, headRY * 0.68, 0, Math.PI, 0);
+    ctx.fill();
+    // Bun on top
+    ctx.beginPath(); ctx.ellipse(cx, headCY - headRY - 8, 18, 14, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Cap/hat option
+  if (cfg.hasHat) {
+    ctx.fillStyle = cfg.hatColor;
+    ctx.beginPath();
+    ctx.ellipse(cx, headCY - headRY + 5, headRX + 6, 10, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(cx - headRX - 8, headCY - headRY + 3, (headRX + 8) * 2, 8);
+    ctx.fillRect(cx - headRX + 2, headCY - headRY - 16, (headRX - 2) * 2, 22);
+  }
+
+  // ── EYES ──
+  // Whites
+  ctx.fillStyle = '#f5f0e8';
+  ctx.beginPath(); ctx.ellipse(cx - 11, headCY, 8, 6, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 11, headCY, 8, 6, 0, 0, Math.PI*2); ctx.fill();
+  // Iris
+  ctx.fillStyle = cfg.eyeColor;
+  ctx.beginPath(); ctx.arc(cx - 10, headCY, 4.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 12, headCY, 4.5, 0, Math.PI*2); ctx.fill();
+  // Pupil
+  ctx.fillStyle = '#0a0505';
+  ctx.beginPath(); ctx.arc(cx - 10, headCY, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 12, headCY, 2.5, 0, Math.PI*2); ctx.fill();
+  // Eye highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.beginPath(); ctx.arc(cx - 8, headCY - 2, 1.4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 14, headCY - 2, 1.4, 0, Math.PI*2); ctx.fill();
+  // Lashes / eyelid line
+  ctx.strokeStyle = 'rgba(30,10,10,0.7)';
+  ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx - 19, headCY - 2); ctx.lineTo(cx - 3, headCY - 3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + 4,  headCY - 2); ctx.lineTo(cx + 20, headCY - 2); ctx.stroke();
+
+  // ── EYEBROWS ──
+  ctx.strokeStyle = cfg.hairColor === '#f5deb3' || cfg.hairColor === '#e8c97a' ? '#8b6530' : cfg.hairColor;
+  ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx - 19, headCY - 12); ctx.quadraticCurveTo(cx - 11, headCY - 15, cx - 3, headCY - 11); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + 4,  headCY - 11); ctx.quadraticCurveTo(cx + 11, headCY - 15, cx + 19, headCY - 12); ctx.stroke();
+
+  // ── NOSE ──
+  const noseSkn = cfg.skinColor;
+  ctx.strokeStyle = shadeColor(noseSkn, -40);
+  ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx - 4, headCY + 6); ctx.lineTo(cx, headCY + 14); ctx.lineTo(cx + 4, headCY + 6); ctx.stroke();
+  // Nostrils
+  ctx.fillStyle = shadeColor(noseSkn, -55);
+  ctx.beginPath(); ctx.ellipse(cx - 5, headCY + 14, 3.5, 2.5, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 5, headCY + 14, 3.5, 2.5,  0.3, 0, Math.PI*2); ctx.fill();
+
+  // ── MOUTH ──
+  // Lips
+  ctx.fillStyle = shadeColor(cfg.skinColor, -30);
+  // Upper lip
+  ctx.beginPath();
+  ctx.moveTo(cx - 13, headCY + 22);
+  ctx.bezierCurveTo(cx - 8, headCY + 20, cx - 3, headCY + 18, cx, headCY + 19);
+  ctx.bezierCurveTo(cx + 3, headCY + 18, cx + 8, headCY + 20, cx + 13, headCY + 22);
+  ctx.bezierCurveTo(cx + 8, headCY + 24, cx + 3, headCY + 24, cx, headCY + 24);
+  ctx.bezierCurveTo(cx - 3, headCY + 24, cx - 8, headCY + 24, cx - 13, headCY + 22);
+  ctx.closePath(); ctx.fill();
+  // Lower lip (fuller)
+  ctx.fillStyle = shadeColor(cfg.skinColor, -20);
+  ctx.beginPath();
+  ctx.moveTo(cx - 13, headCY + 23);
+  ctx.bezierCurveTo(cx - 6, headCY + 32, cx + 6, headCY + 32, cx + 13, headCY + 23);
+  ctx.bezierCurveTo(cx + 7, headCY + 29, cx - 7, headCY + 29, cx - 13, headCY + 23);
+  ctx.closePath(); ctx.fill();
+  // Mouth line
+  ctx.strokeStyle = shadeColor(cfg.skinColor, -60);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(cx - 12, headCY + 23); ctx.lineTo(cx + 12, headCY + 23); ctx.stroke();
+
+  // Glasses if applicable
+  if (cfg.hasGlasses) {
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx - 11, headCY, 10, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx + 11, headCY, 10, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 1, headCY); ctx.lineTo(cx + 1, headCY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 21, headCY); ctx.lineTo(cx - 28, headCY - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 21, headCY); ctx.lineTo(cx + 28, headCY - 3); ctx.stroke();
+  }
+
+  return canvas;
+}
+
+function shadeColor(hex, amount) {
+  // Lighten/darken a hex color
+  const col = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.min(255, ((col >> 16) & 0xff) + amount));
+  const g = Math.max(0, Math.min(255, ((col >>  8) & 0xff) + amount));
+  const b = Math.max(0, Math.min(255, ( col        & 0xff) + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+/* ─── CROWD — canvas sprite billboards ─── */
+// Pre-generated sprite canvases (shared among crowd)
+const SPRITE_POOL = [];
+
+function buildSpritePool() {
+  const SHIRTS = [
+    '#1a2a4a','#E94190','#41C0F0','#2a0a1a','#1a3a1a',
+    '#E63323','#27348B','#FFF042','#0d1628','#3a1a00',
+    '#ff6b35','#00d4aa','#8a2be2','#c8a000','#1a1a1a'
+  ];
+  const PANTS = [
+    '#1a1a2e','#2d1b1b','#0a1a0a','#1c1c28','#2a1500',
+    '#111','#1e2d1e','#2a2a0a'
+  ];
+  const SKINS = [
+    '#f0c89a','#e0a870','#c8956a','#a07040','#8b5e3c',
+    '#7a4a28','#603a20','#4a2a14','#dda878','#b07850'
+  ];
+  const HAIRS = [
+    '#080808','#1a0a00','#3a2000','#c0a050','#e8c97a',
+    '#8b4513','#2a1800','#f5deb3','#6a3a10','#1a1a1a'
+  ];
+  const STYLES = ['short','long','curly','bun'];
+  const EYES   = ['#5c4030','#3a5c30','#305c6a','#1a1a1a','#6a4820'];
+  const HATS   = ['#1a1a1a','#27348B','#E63323','#c8a000','#2a1800'];
+
+  for (let i = 0; i < 12; i++) {
+    const cfg = {
+      shirtColor:  SHIRTS[i % SHIRTS.length],
+      pantsColor:  PANTS[i % PANTS.length],
+      skinColor:   SKINS[i % SKINS.length],
+      hairColor:   HAIRS[i % HAIRS.length],
+      hairStyle:   STYLES[i % STYLES.length],
+      eyeColor:    EYES[i % EYES.length],
+      hasLogo:     i % 4 === 0,
+      hasHat:      i % 5 === 1,
+      hatColor:    HATS[i % HATS.length],
+      hasGlasses:  i % 7 === 3,
+    };
+    SPRITE_POOL.push(drawPersonSprite(cfg));
+  }
+}
+
+function applyCanvasTex(planeEl, canvas) {
+  const doApply = () => {
+    const mesh = planeEl.getObject3D('mesh');
+    if (mesh && mesh.material) {
+      const tex = new THREE.CanvasTexture(canvas);
+      mesh.material.map = tex;
+      mesh.material.transparent = true;
+      mesh.material.alphaTest = 0.3;
+      mesh.material.depthWrite = false;
+      mesh.material.needsUpdate = true;
+    }
+  };
+  if (planeEl.hasLoaded) { doApply(); }
+  else { planeEl.addEventListener('loaded', doApply, { once: true }); }
+}
+
+function spawnCrowd() {
+  if (SPRITE_POOL.length === 0) buildSpritePool();
+  const container = document.getElementById('crowd');
+  const frag = document.createDocumentFragment();
+
+  for (let i = 0; i < 32; i++) {
+    const x   = ((Math.random() - 0.5) * 22).toFixed(2);
+    const z   = (-7 - Math.random() * 14).toFixed(2);
+    const sc  = (0.85 + Math.random() * 0.35).toFixed(3);
+    const dur = Math.floor(2200 + Math.random() * 3000);
+    const swayAmt = (0.8 + Math.random() * 1.2).toFixed(1);
+
+    // Wrap entity (for sway)
+    const ent = document.createElement('a-entity');
+    ent.setAttribute('position', `${x} 0 ${z}`);
+    ent.setAttribute('scale', `${sc} ${sc} ${sc}`);
+    ent.setAttribute('animation', `property: rotation; from: 0 0 -${swayAmt}; to: 0 0 ${swayAmt}; dir: alternate; loop: true; dur: ${dur}; easing: easeInOutSine`);
+
+    // Billboard plane — always faces camera (rotation toward player at z=4.5)
+    const dx = 0 - parseFloat(x);
+    const dz = 4.5 - parseFloat(z);
+    const faceRot = Math.round(Math.atan2(dx, dz) * 180 / Math.PI);
+
+    const plane = document.createElement('a-plane');
+    plane.setAttribute('width', '1.1');
+    plane.setAttribute('height', '2.2');
+    plane.setAttribute('position', '0 1.1 0');
+    plane.setAttribute('rotation', `0 ${faceRot} 0`);
+    plane.setAttribute('material', 'transparent: true; alphaTest: 0.3; side: double; depthWrite: false');
+
+    const spriteCanvas = SPRITE_POOL[i % SPRITE_POOL.length];
+    applyCanvasTex(plane, spriteCanvas);
+
+    ent.appendChild(plane);
+    frag.appendChild(ent);
+  }
+  container.appendChild(frag);
+}
+
+/* ─── VISITOR SPRITE SETUP ─── */
+let visitorSpriteReady = false;
+
+function buildVisitorSprite(scenarioIdx) {
+  // Visitor sprite gets vivid festival colors matching scenario accent
+  const VISITOR_CFGS = [
+    { // Scenario 0 — blue
+      shirtColor: '#164194', pantsColor: '#1a1a2e', skinColor: '#dda878',
+      hairColor: '#1a0a00', hairStyle: 'short', eyeColor: '#3a5c30',
+      hasLogo: true, hasHat: false, hatColor: '#27348B', hasGlasses: false
+    },
+    { // Scenario 1 — pink/magenta
+      shirtColor: '#E94190', pantsColor: '#111', skinColor: '#c8956a',
+      hairColor: '#3a2000', hairStyle: 'long', eyeColor: '#5c4030',
+      hasLogo: false, hasHat: false, hatColor: '#', hasGlasses: true
+    },
+    { // Scenario 2 — red / emergency
+      shirtColor: '#2a0a0a', pantsColor: '#1e2d1e', skinColor: '#f0c89a',
+      hairColor: '#e8c97a', hairStyle: 'curly', eyeColor: '#305c6a',
+      hasLogo: false, hasHat: true, hatColor: '#E63323', hasGlasses: false
+    }
+  ];
+  const cfg = VISITOR_CFGS[scenarioIdx % VISITOR_CFGS.length];
+  const canvas = drawPersonSprite(cfg);
+
+  const plane = document.getElementById('visitor-plane');
+  applyCanvasTex(plane, canvas);
+}
+
+/* ─── VISITOR CONTROL ─── */
+function showVisitor(approachDur, scenarioIdx) {
+  if (SPRITE_POOL.length === 0) buildSpritePool();
+  buildVisitorSprite(scenarioIdx);
+
+  const visitor = document.getElementById('visitor');
+  visitor.setAttribute('position', '0 0 -8');
+  visitor.setAttribute('visible', 'true');
+  // Slide in toward player
+  visitor.setAttribute('animation__approach', `property: position; from: 0 0 -8; to: 0 0 -2.8; dur: ${approachDur}; easing: easeOutCubic`);
+  // Subtle scale pulse (breathing feel)
+  visitor.setAttribute('animation__breathe', 'property: scale; from: 1 1 1; to: 1.01 1.02 1; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine');
+}
+
+function hideVisitor() {
+  const visitor = document.getElementById('visitor');
+  visitor.removeAttribute('animation__breathe');
+  visitor.setAttribute('animation__exit', 'property: position; from: 0 0 -2.8; to: 0 0 -10; dur: 1100; easing: easeInCubic');
+  setTimeout(() => {
+    visitor.setAttribute('visible', 'false');
+    visitor.removeAttribute('animation__approach');
+    visitor.removeAttribute('animation__exit');
+  }, 1150);
+}
+
+/* ─── GAME FLOW ─── */
+function startSim() {
+  document.getElementById('splash').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('model-loading').classList.add('active');
+
+  // Shuffle scenarios
+  scenarios = shuffle(BASE_SCENARIOS).map(s => ({
+    ...s,
+    answers: shuffle(s.answers)
+  }));
+
+  initAudio();
+  applyGroundTexture();
+  applySkyTexture();
+
+  buildSpritePool(); // pre-generate 12 unique person sprites
+
+  const scene = document.getElementById('scene');
+  const onSceneLoaded = () => {
+    spawnStars();
+    spawnCrowd();
+    spawnParticles();
+    document.getElementById('model-loading').classList.remove('active');
+    setTimeout(() => loadScenario(0), 600);
+  };
+
+  if (scene.hasLoaded) { onSceneLoaded(); }
+  else { scene.addEventListener('loaded', onSceneLoaded, { once: true }); }
+}
+
+function loadScenario(idx) {
+  if (idx >= scenarios.length) { endSim(); return; }
+  current = idx;
+  answered = false;
+
+  const sc = scenarios[idx];
+  document.getElementById('hud-num').textContent = idx + 1;
+
+  // Game UI
+  document.getElementById('question-text').textContent = sc.question;
+  for (let i = 0; i < 3; i++) {
+    const btn = document.getElementById(`abtn-${i}`);
+    btn.textContent = sc.answers[i].text;
+    btn.className = 'answer-btn';
+    btn.disabled = false;
+  }
+
+  // Show game UI after brief delay (visitor walking up)
+  document.getElementById('game-ui').style.display = 'block';
+  document.getElementById('game-ui').classList.remove('active');
+
+  // Visitor slides in
+  showVisitor(1400, idx);
+  setTimeout(() => {
+    document.getElementById('game-ui').classList.add('active');
+  }, 1600);
+}
+
+function onAnswer(btnIdx) {
+  if (answered) return;
+  answered = true;
+
+  const sc = scenarios[current];
+  const isCorrect = sc.answers[btnIdx].correct;
+
+  // Disable buttons
+  for (let i = 0; i < 3; i++) {
+    document.getElementById(`abtn-${i}`).disabled = true;
+  }
+
+  // Find correct answer index
+  const correctIdx = sc.answers.findIndex(a => a.correct);
+
+  // Highlight
+  document.getElementById(`abtn-${btnIdx}`).classList.add(isCorrect ? 'correct' : 'wrong');
+  if (!isCorrect) {
+    document.getElementById(`abtn-${correctIdx}`).classList.add('correct');
+  }
+
+  // Score
+  if (isCorrect) {
+    score += 10;
+    playCorrect();
+    flashFeedback('rgba(65,192,240,0.18)');
+  } else {
+    score -= 5;
+    playWrong();
+    flashFeedback('rgba(230,51,35,0.22)');
+  }
+  document.getElementById('score-val').textContent = score;
+
+  // Next scenario
+  setTimeout(() => {
+    document.getElementById('game-ui').classList.remove('active');
+    hideVisitor();
+    setTimeout(() => {
+      document.getElementById('game-ui').style.display = 'none';
+      loadScenario(current + 1);
+    }, 1400);
+  }, 2200);
+}
+
+function flashFeedback(color) {
+  const fb = document.getElementById('feedback');
+  fb.style.background = color;
+  fb.style.opacity = '1';
+  setTimeout(() => { fb.style.opacity = '0'; }, 350);
+}
+
+function endSim() {
+  document.getElementById('game-ui').style.display = 'none';
+  document.getElementById('hud').style.display = 'none';
+  const end = document.getElementById('end-screen');
+  end.style.display = 'flex';
+  document.getElementById('final-score').textContent = Math.max(0, score);
+  document.getElementById('score-val').textContent = Math.max(0, score);
+
+  let msg;
+  const s = Math.max(0, score);
+  if      (s >= 90) msg = '🏆 Topmedewerker! Je handelt in elke situatie professioneel en klantgericht.';
+  else if (s >= 70) msg = '✅ Goed gedaan! Je hebt de meeste situaties juist aangepakt. Nog een paar punten te winnen.';
+  else if (s >= 50) msg = '👍 Aardig begin! Je snapt de basis — bekijk de situaties die fout gingen en probeer het opnieuw.';
+  else if (s >= 30) msg = '📚 Er valt nog wat te leren. Bestudeer de juiste antwoorden goed en doe een nieuwe poging.';
+  else              msg = '💪 Oefening baart kunst. Ga de theorie nog eens na en probeer het opnieuw — je kunt dit!';
+  document.getElementById('end-msg').textContent = msg;
+}
+
+function restartSim() {
+  score = 0; current = 0; answered = false;
+  document.getElementById('end-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('score-val').textContent = '0';
+
+  scenarios = shuffle(BASE_SCENARIOS).map(s => ({
+    ...s,
+    answers: shuffle(s.answers)
+  }));
+
+  const visitor = document.getElementById('visitor');
+  visitor.setAttribute('visible', 'false');
+  visitor.setAttribute('position', '0 0 -8');
+
+  setTimeout(() => loadScenario(0), 400);
+}
+</script>
+
+</body>
+</html>
