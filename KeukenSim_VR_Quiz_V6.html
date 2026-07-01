@@ -560,6 +560,16 @@
   </a-entity>
   <a-plane rotation="-90 0 0" width="60" height="60" position="0 -1.65 0" material="visible:false;side:double"></a-plane>
   <a-light type="ambient" color="#dde0f0" intensity="0.4"></a-light>
+
+  <!-- ══ VR QUIZ BOARD (canvas-texture) ══ -->
+  <a-entity id="vr-quiz-board" visible="false">
+    <a-plane id="vr-panel" width="3.2" height="2.4" material="shader:flat;transparent:true;side:front;opacity:0.98"></a-plane>
+    <a-plane class="clickable" id="vr-opt-0" data-opt="0" width="2.93" height="0.197" position="0 0.514 0.02" material="opacity:0.001;transparent:true;side:front"></a-plane>
+    <a-plane class="clickable" id="vr-opt-1" data-opt="1" width="2.93" height="0.197" position="0 0.274 0.02" material="opacity:0.001;transparent:true;side:front"></a-plane>
+    <a-plane class="clickable" id="vr-opt-2" data-opt="2" width="2.93" height="0.197" position="0 0.034 0.02" material="opacity:0.001;transparent:true;side:front"></a-plane>
+    <a-plane class="clickable" id="vr-opt-3" data-opt="3" width="2.93" height="0.197" position="0 -0.206 0.02" material="opacity:0.001;transparent:true;side:front"></a-plane>
+    <a-plane class="clickable" id="vr-close-plane" data-opt="close" width="0.853" height="0.133" position="0 -0.749 0.02" material="opacity:0.001;transparent:true;side:front" visible="false"></a-plane>
+  </a-entity>
 </a-scene>
 
 <div id="hint" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:rgba(255,255,255,0.6);font-family:'Montserrat',sans-serif;font-size:11px;padding:6px 18px;pointer-events:none;z-index:50;border-top:2px solid #41C0F0;">Kijk naar een bol &#11044; — gaze 1.5s om een vraag te openen</div>
@@ -595,19 +605,6 @@
 #einde{position:fixed;inset:0;z-index:300;background:#0A0A0A;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
 </style>
 
-<div id="quiz">
-  <div id="quiz-inner">
-    <div id="quiz-header">
-      <div id="quiz-icon">&#128293;</div>
-      <div id="quiz-topic">Onderwerp</div>
-      <div id="quiz-progress">Vraag 1 van 5</div>
-    </div>
-    <div id="quiz-q">Vraag...</div>
-    <div id="opts"></div>
-    <div id="quiz-uitleg"></div>
-    <button id="btn-close" onclick="sluitQuiz()">&#10005; Sluiten &amp; verder</button>
-  </div>
-</div>
 
 <div id="score-hud">
   <div id="score-label" style="color:rgba(65,192,240,0.7);font-size:8px;font-weight:900;letter-spacing:3px;text-transform:uppercase;margin-bottom:4px;">SCORE</div>
@@ -618,6 +615,219 @@
 </div><!-- /vr-overlay -->
 
 <script>
+var activeQid = -1;
+var vrCanvas = null, vrCtx = null;
+
+function initVRCanvas(){
+  vrCanvas = document.createElement('canvas');
+  vrCanvas.width = 1200; vrCanvas.height = 900;
+  vrCtx = vrCanvas.getContext('2d');
+}
+
+function drawVRPanel(qid, selectedIdx){
+  if(!vrCanvas || !vrCtx) return;
+  var q = VRAGEN[qid]; if(!q) return;
+  var ctx = vrCtx, W = 1200, H = 900;
+  var LET = ['A','B','C','D'];
+  var kleur = q.kleur || '#41C0F0';
+
+  ctx.fillStyle = '#0A0A14';
+  ctx.fillRect(0,0,W,H);
+
+  var stripes = [
+    {c:'#41C0F0', x:-60, w:60},
+    {c:'#E94190', x:10,  w:50},
+    {c:'#E63323', x:70,  w:55},
+    {c:'#FFF042', x:135, w:48}
+  ];
+  ctx.save();
+  ctx.translate(-120, -120);
+  ctx.rotate(Math.PI/4);
+  stripes.forEach(function(s){
+    ctx.fillStyle = s.c;
+    ctx.globalAlpha = 0.18;
+    ctx.fillRect(s.x, -400, s.w, 1200);
+  });
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = kleur;
+  ctx.fillRect(0, 0, W, 7);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, 0, W, 88);
+  ctx.fillStyle = kleur;
+  ctx.fillRect(0, 0, 6, H);
+
+  ctx.beginPath();
+  ctx.arc(56, 44, 30, 0, Math.PI*2);
+  ctx.fillStyle = kleur;
+  ctx.globalAlpha = 0.2;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.font = '28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(q.icon, 56, 54);
+
+  ctx.font = '900 13px Montserrat,sans-serif';
+  ctx.fillStyle = kleur;
+  ctx.textAlign = 'left';
+  var lbl = q.label.toUpperCase().split('').join(' ');
+  ctx.fillText(lbl, 102, 34);
+  ctx.fillStyle = '#E63323';
+  ctx.fillRect(102, 38, 320, 3);
+
+  var tot = Object.keys(beantwoord).length + (beantwoord[qid]!==undefined ? 0 : 1);
+  ctx.font = '700 18px Montserrat,sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.textAlign = 'right';
+  ctx.fillText('VRAAG  ' + tot + '  /  ' + totaal, W-30, 44);
+  ctx.textAlign = 'left';
+
+  var pct = tot / totaal;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(0, 7, W, 4);
+  ctx.fillStyle = kleur;
+  ctx.fillRect(0, 7, W*pct, 4);
+
+  var qY = 130, qLH = 44;
+  ctx.font = '700 28px Montserrat,sans-serif';
+  var words = q.vraag.split(' '), line='', ly=qY;
+  for(var n=0;n<words.length;n++){
+    var tl=line+words[n]+' ';
+    if(ctx.measureText(tl).width > W-110 && n>0){
+      var o=3;
+      [{c:'#FFF042',dx:-1,dy:1},{c:'#E63323',dx:-.5,dy:.5},{c:'#41C0F0',dx:1,dy:-1,a:.7},{c:'#FFFFFF',dx:0,dy:0}].forEach(function(l){
+        ctx.globalAlpha=l.a||1; ctx.fillStyle=l.c;
+        ctx.fillText(line, 28+l.dx*o, ly+l.dy*o);
+      });
+      ctx.globalAlpha=1;
+      line=words[n]+' '; ly+=qLH;
+    } else line=tl;
+  }
+  [{c:'#FFF042',dx:-1,dy:1},{c:'#E63323',dx:-.5,dy:.5},{c:'#41C0F0',dx:1,dy:-1,a:.7},{c:'#FFFFFF',dx:0,dy:0}].forEach(function(l){
+    ctx.globalAlpha=l.a||1; ctx.fillStyle=l.c;
+    ctx.fillText(line, 28+l.dx*3, ly+l.dy*3);
+  });
+  ctx.globalAlpha=1;
+
+  var oY=ly+48, oH=82, oGap=94;
+  for(var i=0;i<4;i++){
+    var y = oY + i*oGap;
+    var isC=(i===q.correct), isSel=(selectedIdx===i), isAns=(selectedIdx!==undefined);
+    var disabled = isAns && !isC && !isSel;
+    var skew = 12;
+    ctx.beginPath();
+    ctx.moveTo(28+skew, y);
+    ctx.lineTo(W-28, y);
+    ctx.lineTo(W-28-skew, y+oH-8);
+    ctx.lineTo(28, y+oH-8);
+    ctx.closePath();
+    ctx.fillStyle = !isAns ? 'rgba(255,255,255,0.04)' : isC ? 'rgba(99,180,80,0.18)' : isSel ? 'rgba(230,51,35,0.18)' : 'rgba(0,0,0,0.3)';
+    ctx.fill();
+    ctx.strokeStyle = !isAns ? 'rgba(255,255,255,0.12)' : isC ? '#63B450' : isSel ? '#E63323' : 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = isC||isSel ? 2 : 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(28+skew, y);
+    ctx.lineTo(28+skew+72, y);
+    ctx.lineTo(28+72, y+oH-8);
+    ctx.lineTo(28, y+oH-8);
+    ctx.closePath();
+    ctx.fillStyle = !isAns ? '#27348B' : isC ? '#63B450' : isSel ? '#E63323' : '#111';
+    ctx.fill();
+    ctx.font = '900 24px Montserrat,sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText(LET[i], 28+skew/2+36, y+(oH-8)/2+9);
+    ctx.textAlign = 'left';
+    ctx.font = disabled ? '300 22px Montserrat,sans-serif' : '400 22px Montserrat,sans-serif';
+    ctx.fillStyle = disabled ? 'rgba(255,255,255,0.22)' : isC ? '#8BC34A' : isSel ? '#ff8080' : '#E8E8E8';
+    ctx.fillText(q.opties[i], 120, y+(oH-8)/2+9);
+  }
+
+  if(selectedIdx !== undefined){
+    var isRight = (selectedIdx===q.correct);
+    var uitY = oY + 4*oGap + 6;
+    ctx.fillStyle = isRight ? 'rgba(99,180,80,0.1)' : 'rgba(230,51,35,0.1)';
+    ctx.fillRect(28, uitY, W-56, 96);
+    ctx.fillStyle = isRight ? '#63B450' : '#E63323';
+    ctx.fillRect(28, uitY, 4, 96);
+    ctx.font = '400 18px Montserrat,sans-serif';
+    ctx.fillStyle = isRight ? '#8BC34A' : '#ffb3a7';
+    var uw=q.uitleg.split(' '),ul='',uly=uitY+26;
+    for(var m=0;m<uw.length;m++){
+      var utl=ul+uw[m]+' ';
+      if(ctx.measureText(utl).width>W-100 && m>0){ctx.fillText(ul,42,uly);ul=uw[m]+' ';uly+=24;}
+      else ul=utl;
+    }
+    ctx.fillText(ul,42,uly);
+    var btnY = uitY+104;
+    var bW=320, bH=46, bSkew=14;
+    var bX = W/2-bW/2;
+    ctx.beginPath();
+    ctx.moveTo(bX+bSkew, btnY);
+    ctx.lineTo(bX+bW, btnY);
+    ctx.lineTo(bX+bW-bSkew, btnY+bH);
+    ctx.lineTo(bX, btnY+bH);
+    ctx.closePath();
+    ctx.fillStyle = '#41C0F0';
+    ctx.fill();
+    ctx.font = '900 15px Montserrat,sans-serif';
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'center';
+    ctx.fillText('✕  SLUITEN & VERDER', W/2, btnY+30);
+    ctx.textAlign = 'left';
+  }
+}
+
+function updateVRPanelTexture(){
+  if(!vrCanvas) return;
+  var panelEl = document.getElementById('vr-panel');
+  if(!panelEl) return;
+  var tryUpdate = function(){
+    var mesh = panelEl.getObject3D('mesh');
+    if(!mesh || !mesh.material){ setTimeout(tryUpdate,50); return; }
+    var tex = new THREE.CanvasTexture(vrCanvas);
+    tex.needsUpdate = true;
+    mesh.material.map = tex;
+    mesh.material.needsUpdate = true;
+  };
+  setTimeout(tryUpdate, 20);
+}
+
+function positionVRBoard(){
+  var board = document.getElementById('vr-quiz-board');
+  var cam = document.getElementById('cam');
+  if(!board||!cam||!cam.object3D) return;
+  var camPos = new THREE.Vector3();
+  cam.object3D.getWorldPosition(camPos);
+  var fwd = new THREE.Vector3(0,0,-1);
+  fwd.applyQuaternion(cam.object3D.quaternion);
+  fwd.y = 0;
+  if(fwd.length()<0.01) fwd.set(0,0,-1);
+  fwd.normalize().multiplyScalar(2.5);
+  var bp = { x: camPos.x+fwd.x, y: 1.4, z: camPos.z+fwd.z };
+  board.setAttribute('position', bp.x+' '+bp.y+' '+bp.z);
+  board.object3D.lookAt(camPos.x, bp.y, camPos.z);
+}
+
+function showVRBoard(qid){
+  if(!vrCanvas) initVRCanvas();
+  positionVRBoard();
+  drawVRPanel(qid, beantwoord[qid]);
+  updateVRPanelTexture();
+  document.getElementById('vr-quiz-board').setAttribute('visible','true');
+  var showClose = beantwoord[qid]!==undefined;
+  document.getElementById('vr-close-plane').setAttribute('visible', showClose?'true':'false');
+  activeQid = qid;
+}
+
+function hideVRBoard(){
+  var board = document.getElementById('vr-quiz-board');
+  if(board) board.setAttribute('visible','false');
+  activeQid = -1;
+}
+
 AFRAME.registerComponent("thumbstick-locomotion",{
   tick:function(t,dt){
     var gps=navigator.getGamepads?navigator.getGamepads():[];
@@ -732,6 +942,7 @@ function openVraag(qid){
   if(beantwoord[qid]!==undefined){u.textContent=q.uitleg;u.style.display="block";u.className=beantwoord[qid]===q.correct?"":"wrong-uitleg";document.getElementById("btn-close").style.display="inline-block";}
   else{u.style.display="none";document.getElementById("btn-close").style.display="none";}
   document.getElementById("quiz").style.display="flex";
+  showVRBoard(qid);
 }
 function kiesAntwoord(qid,idx){
   var q=VRAGEN[qid];var juist=idx===q.correct;
@@ -746,10 +957,12 @@ function kiesAntwoord(qid,idx){
   u.textContent=q.uitleg;u.style.display="block";u.className=juist?"":"wrong-uitleg";
   document.getElementById("btn-close").style.display="inline-block";
   markHotspotDone(qid,juist);
+  if(vrCanvas && activeQid===qid){ drawVRPanel(qid,idx); updateVRPanelTexture(); document.getElementById('vr-close-plane').setAttribute('visible','true'); }
   if(Object.keys(beantwoord).length===totaal)setTimeout(toonEinde,2200);
 }
 function sluitQuiz(){
   document.getElementById("quiz").style.display="none";
+  hideVRBoard();
 }
 function markHotspotDone(qid,juist){
   var hs=document.querySelector("[data-qid='"+qid+"']");if(!hs)return;
@@ -767,6 +980,7 @@ function updateScore(){
 }
 function toonEinde(){
   document.getElementById("quiz").style.display="none";
+  hideVRBoard();
   document.getElementById("einde").style.display="flex";
   
   var msgs={
@@ -816,6 +1030,17 @@ function opnieuw(){
 document.addEventListener("DOMContentLoaded",function(){
   // Bind click on child geometry (raycaster fires on the mesh entity)
   // Use event delegation via scene
+
+  // VR board antwoord-handlers (gaze fuse + controller trigger)
+  document.querySelectorAll('#vr-opt-0,#vr-opt-1,#vr-opt-2,#vr-opt-3,#vr-close-plane').forEach(function(el){
+    el.addEventListener('click',function(){
+      var opt=el.getAttribute('data-opt');
+      if(opt==='close'){sluitQuiz();return;}
+      if(activeQid<0||beantwoord[activeQid]!==undefined)return;
+      kiesAntwoord(activeQid,parseInt(opt));
+    });
+  });
+
   var scene=document.querySelector("a-scene");
   if(scene){
     scene.addEventListener("enter-vr",function(){
