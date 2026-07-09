@@ -345,7 +345,7 @@
     <a-camera id="cam"
       look-controls="pointerLockEnabled:false;magicWindowTrackingEnabled:true;touchEnabled:true"
       wasd-controls="enabled:false"
-      raycaster="objects:.clickable;far:12;interval:100">
+      raycaster="objects:.clickable;far:20;interval:100">
       <a-cursor id="cursor" fuse="true" fuse-timeout="1500"
         geometry="primitive:ring;radiusInner:0.018;radiusOuter:0.034"
         material="color:#41C0F0;shader:flat;opacity:0.8"
@@ -568,7 +568,7 @@
     <a-plane class="clickable" id="vr-opt-1" data-opt="1" width="2.93" height="0.197" position="0 0.274 0.02" material="opacity:0.001;transparent:true;side:front"></a-plane>
     <a-plane class="clickable" id="vr-opt-2" data-opt="2" width="2.93" height="0.197" position="0 0.034 0.02" material="opacity:0.001;transparent:true;side:front"></a-plane>
     <a-plane class="clickable" id="vr-opt-3" data-opt="3" width="2.93" height="0.197" position="0 -0.206 0.02" material="opacity:0.001;transparent:true;side:front"></a-plane>
-    <a-plane class="clickable" id="vr-close-plane" data-opt="close" width="0.853" height="0.133" position="0 -0.749 0.02" material="opacity:0.001;transparent:true;side:front" visible="false"></a-plane>
+    <a-plane class="clickable" id="vr-close-plane" data-opt="close" width="2.8" height="0.45" position="0 -0.68 0.02" material="opacity:0.001;transparent:true;side:front" visible="false"></a-plane>
   </a-entity>
 </a-scene>
 
@@ -741,7 +741,7 @@ function drawVRPanel(qid, selectedIdx){
     ctx.fillText(LET[i], 28+skew/2+36, y+(oH-8)/2+9);
     ctx.textAlign = 'left';
     ctx.font = disabled ? '300 22px Montserrat,sans-serif' : '400 22px Montserrat,sans-serif';
-    ctx.fillStyle = disabled ? 'rgba(255,255,255,0.22)' : isC ? '#8BC34A' : isSel ? '#ff8080' : '#E8E8E8';
+    ctx.fillStyle = disabled ? 'rgba(255,255,255,0.22)' : (isAns && isC) ? '#8BC34A' : (isAns && isSel) ? '#ff8080' : '#E8E8E8';
     ctx.fillText(q.opties[i], 120, y+(oH-8)/2+9);
   }
 
@@ -1051,16 +1051,11 @@ document.addEventListener("DOMContentLoaded",function(){
     });
     scene.addEventListener("loaded",function(){
       document.querySelectorAll(".quiz-hs").forEach(function(el){
-        // Listen on the sphere (primary click target)
-        var sphere=el.querySelector("a-sphere");
-        var plane=el.querySelector("a-plane");
-        function handleClick(){
+        // Click bubbles van sphere/plane omhoog naar quiz-hs entity
+        el.addEventListener("click",function(){
           if(!el.hasAttribute("data-active"))return;
           openVraag(parseInt(el.getAttribute("data-qid")));
-        }
-        if(sphere)sphere.addEventListener("click",handleClick);
-        if(plane)plane.addEventListener("click",handleClick);
-        el.addEventListener("click",handleClick);
+        });
       });
       // Rechterhand controller trigger
       setTimeout(function(){
